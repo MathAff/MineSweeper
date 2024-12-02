@@ -12,16 +12,15 @@ import java.util.Random;
 public class GamePanel extends JPanel implements ActionListener {
     static final int SCREEN_WIDTH = 600;
     static final int SCREEN_HEIGHT = 600;
-    static final int UNIT_SIZE = 25;
-    static final int GAME_UNITS = (SCREEN_WIDTH*SCREEN_HEIGHT)/UNIT_SIZE;
+    static final int UNIT_SIZE = 120;
+//    static final int GAME_UNITS = (SCREEN_WIDTH*SCREEN_HEIGHT)/UNIT_SIZE;
     static final int delay = 100;
-    final int[] x = new int[GAME_UNITS];
-    final int[] y = new int[GAME_UNITS];
+//    final int[] x = new int[GAME_UNITS];
+//    final int[] y = new int[GAME_UNITS];
     Timer timer;
     Random random;
 
     boolean running;
-    Integer score;
     Integer bombs;
     Integer flags;
 
@@ -35,21 +34,22 @@ public class GamePanel extends JPanel implements ActionListener {
         this.addMouseListener(new MouseListener() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                Integer clickX = e.getX();
-                Integer clickY = e.getY();
+                int clickX = e.getX();
+                int clickY = e.getY();
 
-                ArrayList<Integer> click = getGrid(clickX, clickY);
-                System.out.println("Mouse click in: "+click.getFirst()+", "+click.get(1));
 
                 boolean isLeft = SwingUtilities.isLeftMouseButton(e);
                 boolean isRight = SwingUtilities.isRightMouseButton(e);
 
                 if (isRight) {
-                    if (checkBomb(getGrid(clickX, clickY))) {
+                    if (checkBomb(clickX, clickY)) {
                         gameOver();
+                    } else {
+                        System.out.println("There is "+ checkBombsAround(clickX / UNIT_SIZE, clickY / UNIT_SIZE)+" bombs in ("+clickX / UNIT_SIZE+", "+clickY / UNIT_SIZE+")");
                     }
                 } else if (isLeft) {
-                    addFlag(clickX, clickY);
+                    int a = addFlag(clickX, clickY);
+                    System.out.println(a);
                 }
             }
 
@@ -68,6 +68,62 @@ public class GamePanel extends JPanel implements ActionListener {
         gameStart();
     }
 
+    private Integer checkBombsAround(Integer x, Integer y) {
+
+        int bombsAround;
+        bombsAround = 0;
+
+        if (!checkBomb(x, y)) {
+            for (int k = 1; k <= 8; k++) {
+                switch (k) {
+                    case 1:
+                        if(checkBomb(x-1, y-1)){
+                            bombsAround++;
+                        }
+                        break;
+                    case 2:
+                        if (checkBomb(x-1, y)){
+                            bombsAround++;
+                        }
+                        break;
+                    case 3:
+                        if (checkBomb(x-1, y+1)){
+                            bombsAround++;
+                        }
+                        break;
+                    case 4:
+                        if (checkBomb(x, y-1)){
+                            bombsAround++;
+                        }
+                        break;
+                    case 5:
+                        if (checkBomb(x, y+1)){
+                            bombsAround++;
+                        }
+                        break;
+                    case 6:
+                        if (checkBomb(x+1, y-1)){
+                            bombsAround++;
+                        }
+                        break;
+                    case 7:
+                        if (checkBomb(x+1, y)){
+                            bombsAround++;
+                        }
+                        break;
+                    case 8:
+                        if (checkBomb(x+1, y+1)){
+                            bombsAround++;
+                        }
+                        break;
+                }
+            }
+            return bombsAround;
+        } else {
+            return -1;
+        }
+    }
+
     public void paintComponent (Graphics g) {
         super.paintComponent(g);
         draw(g);
@@ -76,23 +132,40 @@ public class GamePanel extends JPanel implements ActionListener {
     public void draw (Graphics g) {
         if (running) {
             for (int i = 0; i < SCREEN_HEIGHT / UNIT_SIZE; i++) {
-                g.drawLine(i*UNIT_SIZE, 0, i*UNIT_SIZE, SCREEN_HEIGHT);
-                g.drawLine(0, i*UNIT_SIZE, SCREEN_WIDTH, i*UNIT_SIZE);
+                g.drawLine(i * UNIT_SIZE, 0, i * UNIT_SIZE, SCREEN_HEIGHT);
+                g.drawLine(0, i * UNIT_SIZE, SCREEN_WIDTH, i * UNIT_SIZE);
             }
 
-            for (int i = 0; i < 10; i++) {
+            for (ArrayList<Integer> bomb : bombsList) {
                 g.setColor(Color.red);
-                g.fillRect(bombsList.get(i).getFirst() * UNIT_SIZE, bombsList.get(i).get(1) * UNIT_SIZE, UNIT_SIZE, UNIT_SIZE);
+                g.fillRect(bomb.getFirst() * UNIT_SIZE, bomb.get(1) * UNIT_SIZE, UNIT_SIZE, UNIT_SIZE);
+            }
+
+            Integer bombsAround;
+//            Color color;
+
+            for (int i = 0; i <= SCREEN_HEIGHT / UNIT_SIZE; i++) {
+
+                for (int j = 0; j <= SCREEN_WIDTH / UNIT_SIZE; j++) {
+
+                    bombsAround = checkBombsAround(i, j);
+
+                    if (bombsAround > 0) {
+                        g.setColor(Color.green);
+                        g.setFont(new Font("Arial", Font.BOLD, 50));
+//                        System.out.println("("+i+", "+j+") has "+bombsAround+" bombs");
+                        g.drawString(String.valueOf(bombsAround), (i * UNIT_SIZE), (j * UNIT_SIZE));
+                    }
+                }
             }
         }
     }
 
     public void gameStart () {
-        initField();
-        score = 0;
-        bombs = 10;
-        flags = 10;
+        this.bombs = 10;
+        this.flags = 10;
         running = true;
+        initField();
         timer = new Timer(delay, this);
         timer.start();
     }
@@ -108,7 +181,7 @@ public class GamePanel extends JPanel implements ActionListener {
     public void initField () {
         random = new Random();
         ArrayList <Integer> Coordinates;
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < bombs; i++) {
             Coordinates = new ArrayList<>();
 
             Integer x = random.nextInt(SCREEN_WIDTH/UNIT_SIZE);
@@ -131,27 +204,31 @@ public class GamePanel extends JPanel implements ActionListener {
         });
     }
 
-    public boolean checkBomb (ArrayList <Integer> checkBomb) {
+    public boolean checkBomb (Integer x, Integer y) {
+        ArrayList <Integer> checkBomb = new ArrayList<>();
+        checkBomb.add(x);
+        checkBomb.add(y);
+
         return bombsList.contains(checkBomb);
     }
 
-    private ArrayList<Integer> getGrid(Integer x, Integer y) {
-        Integer xCoordinate = x/UNIT_SIZE;
-        Integer yCoordinate = y/UNIT_SIZE;
-        
-        ArrayList <Integer> gridCoordinate = new ArrayList<>();
-        gridCoordinate.add(xCoordinate);
-        gridCoordinate.add(yCoordinate);
-        
-        return gridCoordinate;
-    }
+//    private ArrayList<Integer> getGrid(Integer x, Integer y) {
+//        Integer xCoordinate = x/UNIT_SIZE;
+//        Integer yCoordinate = y/UNIT_SIZE;
+//
+//        ArrayList <Integer> gridCoordinate = new ArrayList<>();
+//        gridCoordinate.add(xCoordinate);
+//        gridCoordinate.add(yCoordinate);
+//
+//        return gridCoordinate;
+//    }
 
-    public void addFlag (Integer x, Integer y) {
-
+    public Integer addFlag (Integer x, Integer y) {
+        return x + y;
     }
 
     public void gameOver () {
-        System.out.println("Perdeu otário HAHAHAHA");
+        System.out.println("You Lose");
     }
 
     @Override
